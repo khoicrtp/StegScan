@@ -20,7 +20,7 @@ var OUTPUT_DIR = ""
 type MagicHeader struct {
 	FileType    string
 	MagicBytes  []byte
-	ExtractFunc func(data []byte, outputDir string) error
+	ExtractFunc func(data []byte, outputDir string, index int) error
 }
 
 func readMagicHeaders(filename string) ([]MagicHeader, error) {
@@ -55,7 +55,7 @@ func readMagicHeaders(filename string) ([]MagicHeader, error) {
 
 		switch fileType {
 		case "PNG":
-			header.ExtractFunc = func(data []byte, outputDir string) error {
+			header.ExtractFunc = func(data []byte, outputDir string, index int) error {
 				reader := bytes.NewReader(data)
 				image, _, err := image.Decode(reader)
 				if err != nil {
@@ -71,7 +71,7 @@ func readMagicHeaders(filename string) ([]MagicHeader, error) {
 				return png.Encode(outputFile, image)
 			}
 		case "GIF":
-			header.ExtractFunc = func(data []byte, outputDir string) error {
+			header.ExtractFunc = func(data []byte, outputDir string, index int) error {
 				reader := bytes.NewReader(data)
 				image, _, err := image.Decode(reader)
 				if err != nil {
@@ -88,14 +88,14 @@ func readMagicHeaders(filename string) ([]MagicHeader, error) {
 			}
 		// Add more cases for other file types as needed
 		default:
-			header.ExtractFunc = func(data []byte, outputDir string) error {
+			header.ExtractFunc = func(data []byte, outputDir string, index int) error {
 				outputFile, err := os.Create(filepath.Join(outputDir, FILENAME+"."+strings.ToLower(fileType)))
 				if err != nil {
 					return err
 				}
 				defer outputFile.Close()
 
-				_, err = outputFile.Write(data)
+				_, err = outputFile.Write(data[index:])
 				return err
 			}
 		}
@@ -117,7 +117,8 @@ func extractEmbeddedFiles(inputFilePath string, outputDir string, magicHeaders [
 	for _, header := range magicHeaders {
 		if bytes.Contains(data, header.MagicBytes) {
 			fmt.Printf("Extracting %s...\n", header.FileType)
-			if err := header.ExtractFunc(data, outputDir); err != nil {
+			index := bytes.Index(data, header.MagicBytes)
+			if err := header.ExtractFunc(data, outputDir, index); err != nil {
 				return err
 			}
 		}
